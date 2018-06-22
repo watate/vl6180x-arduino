@@ -103,8 +103,17 @@ void VL6180X::configureDefault(void)
   // "Recommended : Public registers"
 
   // readout__averaging_sample_period = 48
-  writeReg(READOUT__AVERAGING_SAMPLE_PERIOD, 0x30);
-
+  //writeReg(READOUT__AVERAGING_SAMPLE_PERIOD, 0x30);
+  /* Walter: Lower settings will result in increased noise
+     This setting is programmable in the range 0 - 255
+       However, there is a constraint. Range convergence (variable time) and readout averaging
+       must be completed within the specified max convergence time.
+         Default readout averaging period is calculated as follows:
+         1300us + (48 * 64.5us) = 4.3ms, note: 48 is the multiplier that we code in
+  */
+  writeReg(READOUT__AVERAGING_SAMPLE_PERIOD, 0x107);
+  
+  
   // sysals__analogue_gain_light = 6 (ALS gain = 1 nominal, actually 1.01 according to Table 14 in datasheet)
   writeReg(SYSALS__ANALOGUE_GAIN, 0x46);
 
@@ -122,10 +131,15 @@ void VL6180X::configureDefault(void)
   // "Optional: Public registers"
 
   // sysrange__intermeasurement_period = 9 (100 ms)
+  /* Walter: Intermeasurement period needs to be set to a value that is above the maximum allowable full ranging cycle period
+     Full ranging cycle = Max convergence time + 5 ms
+     = 63ms + 5ms
+     = 68ms
+  */
   writeReg(SYSRANGE__INTERMEASUREMENT_PERIOD, 0x09);
 
   // sysals__intermeasurement_period = 49 (500 ms)
-  writeReg(SYSALS__INTERMEASUREMENT_PERIOD, 0x31);
+  writeReg(SYSALS__INTERMEASUREMENT_PERIOD, 0x3F);
 
   // als_int_mode = 4 (ALS new sample ready interrupt); range_int_mode = 4 (range new sample ready interrupt)
   writeReg(SYSTEM__INTERRUPT_CONFIG_GPIO, 0x24);
@@ -134,13 +148,18 @@ void VL6180X::configureDefault(void)
   // Reset other settings to power-on defaults
 
   // sysrange__max_convergence_time = 49 (49 ms)
-  writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 0x31);
+  //writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 0x31);
+  // Walter: Change max convergence time to its highest value for better accuracy (63ms)
+  writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 0x3F);
 
   // disable interleaved mode
   writeReg(INTERLEAVED_MODE__ENABLE, 0);
 
   // reset range scaling factor to 1x
   setScaling(1);
+  
+  // Walter: Some more of my own additional tweaks on other registers to reduce noise
+  
 }
 
 // Writes an 8-bit register
@@ -258,9 +277,12 @@ void VL6180X::setScaling(uint8_t new_scaling)
 
   // This function does not apply scaling to RANGE_IGNORE_VALID_HEIGHT.
 
+  /*
   // enable early convergence estimate only at 1x scaling
   uint8_t rce = readReg(VL6180X::SYSRANGE__RANGE_CHECK_ENABLES);
   writeReg(VL6180X::SYSRANGE__RANGE_CHECK_ENABLES, (rce & 0xFE) | (scaling == 1));
+  */
+  //For now, we disable ECE because we don't care about power consumption
 }
 
 // Performs a single-shot ranging measurement
